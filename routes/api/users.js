@@ -19,7 +19,7 @@ router.patch(
   '/avatars',
   guard,
   upload.single('avatarURL'),
-  controller.updateAvatars
+  wrap(controller.updateAvatars)
 );
 
 module.exports = router;

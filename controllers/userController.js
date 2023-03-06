@@ -5,7 +5,7 @@ const path = require('path');
 const jimp = require('jimp');
 const { VERTICAL_ALIGN_MIDDLE } = require('jimp');
 
-const tempDir = path.join(__dirname, '../../', 'public', 'avatars');
+const tempDir = path.join(__dirname, '..', 'public', 'avatars');
 
 require('dotenv').config();
 
@@ -89,32 +89,28 @@ const logOut = async (req, res, next) => {
 const updateAvatars = async (req, res, next) => {
   try {
     const id = req.user?.id;
-    // console.log('file', req.file);
 
     const { path: tempUpload, originalname } = req.file;
 
     const [extention] = originalname.split('.').reverse();
-    console.log('exten', extention);
     const avatarName = `${id}.${extention}`;
-    console.log('avatarname', avatarName);
+
     const resultUpload = path.join(tempDir, avatarName);
-    console.log('resultUpload', resultUpload);
+
     const { file } = req;
-    // console.log('fileses', file);
+
     const img = await jimp.read(file.path);
-    // console.log('img', img);
+
     await img
       .autocrop()
       .cover(250, 250, jimp.HORIZONTAL_ALIGN_CENTER || VERTICAL_ALIGN_MIDDLE)
       .writeAsync(file.path);
-    // console.log('images', images);
+
     await fs.rename(tempUpload, resultUpload);
 
-    // console.log('avatar', avatar);
     const avatarURL = path.join('avatars', resultUpload);
+    await User.updateUserAvatar(id, avatarURL);
 
-    console.log('avatarUrl', avatarURL);
-    await User.updateUserAvatar(id, { avatarURL });
     res.json({
       user: {
         avatarURL,
