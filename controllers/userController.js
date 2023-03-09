@@ -1,5 +1,11 @@
 const User = require('../models/userModel');
 const jsonwebtoken = require('../helper/jsonwebtoken');
+const fs = require('fs/promises');
+const path = require('path');
+const jimp = require('jimp');
+const { VERTICAL_ALIGN_MIDDLE } = require('jimp');
+
+const tempDir = path.join(__dirname, '..', 'public', 'avatars');
 
 require('dotenv').config();
 
@@ -20,6 +26,7 @@ const register = async (req, res, next) => {
       user: {
         subscription: newUser.subscription,
         email: newUser.email,
+        avatarURL: newUser.avatarURL,
       },
     });
   } catch (error) {
@@ -79,9 +86,46 @@ const logOut = async (req, res, next) => {
   return res.status(204).json({});
 };
 
+const updateAvatars = async (req, res, next) => {
+  try {
+    const id = req.user?.id;
+
+    const { path: tempUpload, originalname } = req.file;
+
+    const [extention] = originalname.split('.').reverse();
+    const avatarName = `${id}.${extention}`;
+
+    const resultUpload = path.join(tempDir, avatarName);
+
+    const { file } = req;
+
+    const img = await jimp.read(file.path);
+
+    await img
+      .autocrop()
+      .cover(250, 250, jimp.HORIZONTAL_ALIGN_CENTER || VERTICAL_ALIGN_MIDDLE)
+      .writeAsync(file.path);
+
+    await fs.rename(tempUpload, resultUpload);
+
+    const avatarURL = path.join('avatars', resultUpload);
+    await User.updateUserAvatar(id, avatarURL);
+
+    res.json({
+      user: {
+        avatarURL,
+      },
+      message: 'Avatar renewed',
+    });
+  } catch (error) {
+    next();
+  }
+};
+
 module.exports = {
   register,
   logIn,
   getCurrent,
   logOut,
+  updateAvatars,
 };

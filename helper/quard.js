@@ -1,6 +1,6 @@
 const passport = require('passport');
 
-require('../config/passport');
+require('../middlewares/auth');
 
 const guard = (req, res, next) => {
   passport.authenticate('jwt', { session: false }, (err, user) => {
