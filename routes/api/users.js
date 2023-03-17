@@ -9,6 +9,10 @@ const controller = require('../../controllers/userController');
 
 router.post('/signup', validateUser, wrap(controller.register));
 
+router.get('/verify/:verificationToken', controller.verify);
+
+router.post('/verify', controller.resendVerify);
+
 router.post('/login', validateUser, wrap(controller.logIn));
 
 router.get('/current', guard, wrap(controller.getCurrent));

@@ -11,6 +11,7 @@ const schemaAddUser = Joi.object({
   password: Joi.string().min(6).max(20).required(),
   token: Joi.string(),
   avatarURL: Joi.string(),
+  verificationToken: Joi.string(),
 });
 
 const validate = require('./validation');

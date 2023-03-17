@@ -1,37 +1,78 @@
 const User = require('../models/userModel');
 const jsonwebtoken = require('../helper/jsonwebtoken');
+const createVerifyEmail = require('../helper/createVerifyEmail');
+const sendEmail = require('../helper/sgMail');
 const fs = require('fs/promises');
 const path = require('path');
 const jimp = require('jimp');
+const verifyEmailUser = require('../validation/verifyEmailUser');
 const { VERTICAL_ALIGN_MIDDLE } = require('jimp');
+// const { nanoid } = require('nanoid');
+const { v4: uuidv4 } = require('uuid');
 
 const tempDir = path.join(__dirname, '..', 'public', 'avatars');
 
 require('dotenv').config();
 
 const register = async (req, res, next) => {
-  const user = await User.getUserByEmail(req.body.email);
+  const { email, password, subscription } = req.body;
+  const user = await User.getUserByEmail(email);
+  console.log('user', user);
   if (user) {
     return res.status(409).json({
       message: 'Email in use',
     });
   }
-  try {
-    const newUser = await User.createUser(req.body);
-    const token = jsonwebtoken.create(newUser.id);
-    await User.updateToken(newUser.id, token);
 
-    return res.status(201).json({
-      token,
-      user: {
-        subscription: newUser.subscription,
-        email: newUser.email,
-        avatarURL: newUser.avatarURL,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
+  const verificationToken = uuidv4();
+  console.log('verify', verificationToken);
+  const newUser = await User.createUser({
+    email,
+    password,
+    subscription,
+    verificationToken,
+  });
+  const token = jsonwebtoken.create(newUser.id);
+  const mail = createVerifyEmail(email, verificationToken);
+  console.log('mail', mail);
+  await sendEmail(mail);
+  await User.updateToken(newUser.id, token);
+  res.status(201).json({
+    user: {
+      email: newUser.email,
+      subscription: 'starter',
+      verificationToken: newUser.verificationToken,
+      avatarURL: newUser.avatarURL,
+    },
+  });
+  // const user = await User.getUserByEmail(req.body.email);
+  // if (user) {
+  //   return res.status(409).json({
+  //     message: 'Email in use',
+  //   });
+  // }
+  // try {
+  //   const verificationToken = nanoid();
+  //   console.log('verify', verificationToken);
+  //   const newUser = await User.createUser(req.body, verificationToken);
+  //   console.log('newUser', newUser);
+  //   const token = jsonwebtoken.create(newUser.id);
+  //   const mail = createVerifyEmail(req.body.email, verificationToken);
+  //   console.log('mail', mail);
+  //   await sendEmail(mail);
+  //   await User.updateToken(newUser.id, token);
+  //   return res.status(201).json({
+  //     token,
+  //     user: {
+  //       subscription: newUser.subscription,
+  //       email: newUser.email,
+  //       avatarURL: newUser.avatarURL,
+  //       verificationToken: newUser.verificationToken,
+  //     },
+  //   });
+  // } catch (error) {
+  //   next(error);
+  // }
 };
 
 const logIn = async (req, res, next) => {
@@ -45,7 +86,11 @@ const logIn = async (req, res, next) => {
       message: 'Email or password is wrong',
     });
   }
-
+  if (!user.verify) {
+    return res.status(401).json({
+      message: 'Email not verify',
+    });
+  }
   const token = jsonwebtoken.create(user.id);
   await User.updateToken(user.id, token);
 
@@ -122,10 +167,52 @@ const updateAvatars = async (req, res, next) => {
   }
 };
 
+const resendVerify = async (req, res) => {
+  const { error } = verifyEmailUser.validate(req.body);
+  if (error) {
+    return res.status(400).json({
+      message: error.message,
+    });
+  }
+  const { email } = req.body;
+  const user = await User.getUserByEmail(email);
+
+  if (!user) {
+    return res
+      .status(400)
+      .json({ message: 'Verification has already been passed' });
+  }
+
+  const mail = await createVerifyEmail(email, user.verificationToken);
+  await sendEmail(mail);
+
+  res.json({
+    message: 'Verification email sent',
+  });
+};
+
+const verify = async (req, res) => {
+  const { verificationToken } = req.params;
+  console.log('verificationToken', verificationToken);
+  const user = await User.getUserVerificationToken(verificationToken);
+  console.log('user', user);
+  if (!user) {
+    return res.status(404).json({
+      message: 'User not found',
+    });
+  }
+  await User.updateVerificationToken(user._id, true, null);
+  res.json({
+    message: 'Verification successful',
+  });
+};
+
 module.exports = {
   register,
   logIn,
   getCurrent,
   logOut,
   updateAvatars,
+  resendVerify,
+  verify,
 };
