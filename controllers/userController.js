@@ -178,6 +178,10 @@ const resendVerify = async (req, res) => {
   const user = await User.getUserByEmail(email);
 
   if (!user) {
+    return res.status(400).json({ message: 'User not found' });
+  }
+
+  if (user.verify) {
     return res
       .status(400)
       .json({ message: 'Verification has already been passed' });
